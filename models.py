@@ -18,12 +18,6 @@ class NoteInsert(BaseModel):
     title: str
     content: str
     user_id: str
-    created_at: datetime
 
-class NoteOut(BaseModel):
+class NoteUpdate(NoteInsert):
     note_id: str
-
-
-class NoteUpdate(BaseModel):
-    title: Optional[str]
-    content: Optional[str]

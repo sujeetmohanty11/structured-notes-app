@@ -1,7 +1,7 @@
 import uvicorn
+import datetime
 from fastapi import FastAPI, HTTPException
 from uuid import uuid4
-
 from models import *
 from database import *
 
@@ -12,7 +12,7 @@ mongo_db = MongoConnect()
 async def get_user(id: str):
     users = list(mongo_db.users_collection.find({"user_id": id}, {'user_id', 'password', 'joined_on', 'gender'}))[0]
     print(users, type(users['user_id']))
-    return {'Message': "Successfull", "Data": users['user_id']}
+    return {'msg': "Successful", "data": users['user_id']}
 
 @app.post("/register")
 def register(payload: UserRegister):
@@ -26,7 +26,8 @@ def register(payload: UserRegister):
         "email": payload.email,
         "phone": payload.phone,
         "gender": payload.gender,
-        "password": payload.password
+        "password": payload.password,
+        # "joined_on": datetime.datetime.now()
     })
     return {"msg": f"Registered {payload.first_name}", "email": payload.email}
 
@@ -37,6 +38,26 @@ def login(payload: UserLogin):
         return {'msg': 'login successful', "user_email": payload.email}
     else:
         raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+
+@app.post("/insert_notes")
+def notes_insert(note: NoteInsert):
+    note_id = str(uuid4())
+    mongo_db.notes_collection.insert_one({
+        "note_id": note_id,
+        "user_id": note.user_id,
+        "title": note.title,
+        "body" : note.content,
+        # "created_on": datetime.datetime.now()
+    })
+    return {'msg':'notes created successfully', 'note_id': {note_id}, 'title': {note.title}}
+
+@app.put("/update_notes")
+def notes_update(update: NoteUpdate):
+    mongo_db.notes_collection.update_one(
+        {'note_id': update.note_id}, {"$set": {"body": update.content}}
+    )
+    return {'msg': 'updated successfully', 'title': update.title, 'body': update.content}
 
 if __name__ == "__main__":
     uvicorn.run(app)
