@@ -6,19 +6,20 @@ from models import *
 from database import *
 
 app = FastAPI()
+mongo_db = MongoConnect()
 
 @app.get("/user_info")
 async def get_user(id: str):
-    users = list(users_collection.find({"user_id": id}, {'user_id', 'password', 'joined_on', 'gender'}))[0]
+    users = list(mongo_db.users_collection.find({"user_id": id}, {'user_id', 'password', 'joined_on', 'gender'}))[0]
     print(users, type(users['user_id']))
     return {'Message': "Successfull", "Data": users['user_id']}
 
 @app.post("/register")
 def register(payload: UserRegister):
-    if users_collection.find_one({"email": payload.email}):
+    if mongo_db.users_collection.find_one({"email": payload.email}):
         raise HTTPException(status_code=400, detail="Username exists")
     user_id = str(uuid4())
-    users_collection.insert_one({
+    mongo_db.users_collection.insert_one({
         "user_id": user_id,
         "first_name": payload.first_name,
         "last_name" : payload.last_name,
@@ -31,7 +32,7 @@ def register(payload: UserRegister):
 
 @app.post("/login")
 def login(payload: UserLogin):
-    if users_collection.find_one({"email": payload.email,
+    if mongo_db.users_collection.find_one({"email": payload.email,
                                   "password": payload.password}, {"email", 'password'}):
         return {'msg': 'login successful', "user_email": payload.email}
     else:
