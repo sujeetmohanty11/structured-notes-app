@@ -9,6 +9,7 @@ class UserRegister(BaseModel):
     phone: str
     gender: str
     password: str
+    joined_at: Optional[datetime] = datetime.utcnow()
 
 class UserLogin(BaseModel):
     email: str
@@ -18,6 +19,8 @@ class NoteInsert(BaseModel):
     title: str
     content: str
     user_id: str
+    created_at: Optional[datetime] = datetime.utcnow()
 
 class NoteUpdate(NoteInsert):
     note_id: str
+    updated_at: Optional[datetime] = datetime.utcnow()
