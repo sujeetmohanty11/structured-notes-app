@@ -8,10 +8,16 @@ from database import *
 app = FastAPI()
 mongo_db = MongoConnect()
 
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the Notes API"}
+
 
 @app.get("/user_info")
 async def get_user(id: str):
     users = list(mongo_db.users_collection.find({"user_id": id}, {'user_id', 'password', 'joined_on', 'gender'}))[0]
+    if not users:
+        raise HTTPException(status_code=404, detail="User not found")
     print(users, type(users['user_id']))
     return {'msg': "Successful", "data": users['user_id']}
 
