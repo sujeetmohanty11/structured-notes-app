@@ -4,8 +4,9 @@ from fastapi import FastAPI, HTTPException
 from uuid import uuid4
 from models import *
 from database import *
-from auth_utils import create_access_token, verify_token
+from auth_utils import create_access_token, verify_token, hash_password, verify_password
 from fastapi import Header, Depends
+from crypto_utils import encrypt_data, decrypt_data
 
 app = FastAPI()
 mongo_db = MongoConnect()
@@ -34,7 +35,7 @@ def register(payload: UserRegister):
         "email": payload.email,
         "phone": payload.phone,
         "gender": payload.gender,
-        "password": payload.password,
+        "password": hash_password(payload.password),
         "joined_at": payload.joined_at
     })
     return {"msg": f"Registered {payload.first_name}", "email": payload.email}
@@ -49,7 +50,7 @@ def login(payload: UserLogin):
 
     print("User found:", user)
 
-    if user and user["password"] == payload.password:
+    if user and verify_password(payload.password, user["password"]):
         token = create_access_token({"user_id": user["user_id"]})
         return {"msg": "Login successful", "access_token": token}
     else:
@@ -63,9 +64,9 @@ def notes_insert(note: NoteInsert, token: str = Header(...)):
     mongo_db.notes_collection.insert_one({
         "note_id": note_id,
         "user_id": user_id,  # associate note with logged-in user
-        "title": note.title,
-        "body": note.content,
-        "created_at": note.created_at
+        "title": encrypt_data(note.title),
+        "body": encrypt_data(note.content),
+        "created_at": datetime.datetime.now().isoformat()
     })
     return {'msg': 'notes created successfully', 'note_id': note_id, 'title': note.title}
 
@@ -75,7 +76,11 @@ def notes_update(update: NoteUpdate, token: str = Header(...)):
 
     # You may want to check if the note belongs to user_id here (optional for extra security)
     mongo_db.notes_collection.update_one(
-        {'note_id': update.note_id}, {"$set": {"body": update.content}}
+        {'note_id': update.note_id, 'user_id': user_id},
+        {"$set": {
+            "body": encrypt_data(update.content),
+            "title": encrypt_data(update.title)  # If you're updating title too
+        }}
     )
     return {'msg': 'updated successfully', 'title': update.title, 'body': update.content}
 
@@ -83,9 +88,27 @@ def notes_update(update: NoteUpdate, token: str = Header(...)):
 def get_notes(token: str = Header(...)):
     user_id = verify_token(token)
     print("User ID from token:", user_id)
+
     notes = list(mongo_db.notes_collection.find({"user_id": user_id}, {"_id": 0}))
+
+    # Decrypt title and body before returning to frontend
+    for note in notes:
+        note["title"] = decrypt_data(note["title"])
+        note["body"] = decrypt_data(note["body"])
+
     print(f"Found {len(notes)} notes for user_id {user_id}")
     return {"msg": "Success", "data": notes}
+
+@app.delete("/delete_note/{note_id}")
+def delete_note(note_id: str, token: str = Header(...)):
+    user_id = verify_token(token)
+    result = mongo_db.notes_collection.delete_one({"note_id": note_id, "user_id": user_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Note not found or unauthorized")
+
+    return {"msg": "Note deleted successfully", "note_id": note_id}
+
 
 if __name__ == "__main__":
     uvicorn.run(app)

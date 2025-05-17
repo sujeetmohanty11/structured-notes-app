@@ -3,6 +3,7 @@ from jose import JWTError, jwt
 import os
 from dotenv import load_dotenv
 from fastapi import HTTPException, status, Depends
+import bcrypt
 
 load_dotenv()
 
@@ -26,3 +27,9 @@ def verify_token(token: str):
         return user_id
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
